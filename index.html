@@ -596,12 +596,8 @@
 
 <main>
   <div id="tab-schedule"  class="tab-panel active">
-    <div class="schedule-filters">
-      <button class="filter-btn active" data-pool="all"       onclick="filterSchedule('all',this)">All Games</button>
-      <button class="filter-btn"        data-pool="Pool A"    onclick="filterSchedule('Pool A',this)">Pool A</button>
-      <button class="filter-btn"        data-pool="Pool B"    onclick="filterSchedule('Pool B',this)">Pool B</button>
-      <button class="filter-btn"        data-pool="Pool C"    onclick="filterSchedule('Pool C',this)">Pool C</button>
-      <button class="filter-btn"        data-pool="Knockouts" onclick="filterSchedule('Knockouts',this)">Knockouts</button>
+    <div class="schedule-filters" id="schedule-filters">
+      <!-- dynamically populated -->
     </div>
     <div id="schedule-content"><div class="loading"><div class="spinner"></div>Loading schedule…</div></div>
   </div>
@@ -655,27 +651,25 @@ async function loadData() {
 }
 
 function parseCSV(text) {
+  // Column order: Time(0) | Pitch(1) | Tournament(2) | Pool(3) | Team A(4) | Team B(5) | A Score(6) | B Score(7) | Referee(8)
   const lines = text.trim().split('\n');
   const games = [];
-  // Detect if first column is "Tournament" by checking header row
-  const headerRow = parseRow(lines[0]).map(h => h.trim().toLowerCase());
-  const hasTournament = headerRow[0] === 'tournament';
-  const offset = hasTournament ? 1 : 0;
-
   for (let i = 1; i < lines.length; i++) {
     const r = parseRow(lines[i]);
-    const poolVal = r[offset + 2]?.trim() || '';
-    if (!poolVal) continue;
+    const tournament = r[2]?.trim() || '';
+    const pool       = r[3]?.trim() || '';
+    // Skip rows that have neither a tournament nor a pool
+    if (!tournament && !pool) continue;
     games.push({
-      tournament: hasTournament ? (r[0]?.trim() || '') : 'Default',
-      time:    r[offset + 0]?.trim() || '',
-      pitch:   r[offset + 1]?.trim() || '',
-      pool:    poolVal,
-      teamA:   r[offset + 3]?.trim() || '',
-      teamB:   r[offset + 4]?.trim() || '',
-      scoreA:  r[offset + 5]?.trim() || '',
-      scoreB:  r[offset + 6]?.trim() || '',
-      referee: r[offset + 7]?.trim() || '',
+      time:       r[0]?.trim() || '',
+      pitch:      r[1]?.trim() || '',
+      tournament: tournament   || 'Default',
+      pool:       pool,
+      teamA:      r[4]?.trim() || '',
+      teamB:      r[5]?.trim() || '',
+      scoreA:     r[6]?.trim() || '',
+      scoreB:     r[7]?.trim() || '',
+      referee:    r[8]?.trim() || '',
     });
   }
   return games;
@@ -768,10 +762,6 @@ function selectTournament(name, btn) {
   document.querySelectorAll('.tourn-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   activeFilter = 'all'; // reset pool filter when switching tournament
-  document.querySelectorAll('.filter-btn').forEach(b => {
-    b.classList.remove('active');
-    if (b.dataset.pool === 'all') b.classList.add('active');
-  });
   renderAll();
 }
 
@@ -815,10 +805,35 @@ function filterSchedule(pool, btn) {
   activeFilter = pool;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  renderSchedule();
+  renderScheduleTable();
 }
 
 function renderSchedule() {
+  const tgames = tournamentGames();
+
+  // Build dynamic filter buttons from pools in this tournament
+  const filtersEl = document.getElementById('schedule-filters');
+  const seenPools = [];
+  let hasKnockouts = false;
+  for (const g of tgames) {
+    if (isKnockout(g.pool)) { hasKnockouts = true; }
+    else if (!seenPools.includes(g.pool) && g.pool) { seenPools.push(g.pool); }
+  }
+
+  let filterHtml = `<button class="filter-btn${activeFilter==='all'?' active':''}" data-pool="all" onclick="filterSchedule('all',this)">All Games</button>`;
+  for (const p of seenPools) {
+    const safe = p.replace(/'/g,"\\'");
+    filterHtml += `<button class="filter-btn${activeFilter===p?' active':''}" data-pool="${p}" onclick="filterSchedule('${safe}',this)">${p}</button>`;
+  }
+  if (hasKnockouts) {
+    filterHtml += `<button class="filter-btn${activeFilter==='Knockouts'?' active':''}" data-pool="Knockouts" onclick="filterSchedule('Knockouts',this)">Knockouts</button>`;
+  }
+  if (filtersEl) filtersEl.innerHTML = filterHtml;
+
+  renderScheduleTable();
+}
+
+function renderScheduleTable() {
   let games = tournamentGames();
   if (activeFilter === 'Knockouts') games = games.filter(g => isKnockout(g.pool));
   else if (activeFilter !== 'all')  games = games.filter(g => g.pool === activeFilter);
