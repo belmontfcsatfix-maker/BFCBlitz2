@@ -258,9 +258,14 @@
   .filter-btn[data-pool="Pool C"].active   { background: var(--pool-c); }
   .filter-btn[data-pool="Knockouts"].active{ background: var(--yellow); }
   #pitch-btn-tournament.active,
-  #pitch-btn-all.active { background: var(--yellow); color: var(--navy); border-color: var(--yellow); }
+  #pitch-btn-all.active,
   #sched-btn-tournament.active,
-  #sched-btn-all.active { background: var(--yellow); color: var(--navy); border-color: var(--yellow); }
+  #sched-btn-all.active {
+    background: var(--yellow) !important;
+    color: var(--navy) !important;
+    border-color: var(--yellow) !important;
+    font-weight: 700;
+  }
 
   #schedule-view-toggle { margin-bottom: 0; }
   #schedule-filters { margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); }
@@ -1117,7 +1122,6 @@ function renderStandings() {
       </tr>`;
     });
     html += `</tbody></table>
-      <div class="qualify-note">🏆 Winner qualifies · Best 3rd also advances</div>
     </div>`;
   }
   html += '</div>';
