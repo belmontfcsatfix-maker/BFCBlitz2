@@ -259,6 +259,11 @@
   .filter-btn[data-pool="Knockouts"].active{ background: var(--yellow); }
   #pitch-btn-tournament.active,
   #pitch-btn-all.active { background: var(--yellow); color: var(--navy); border-color: var(--yellow); }
+  #sched-btn-tournament.active,
+  #sched-btn-all.active { background: var(--yellow); color: var(--navy); border-color: var(--yellow); }
+
+  #schedule-view-toggle { margin-bottom: 0; }
+  #schedule-filters { margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); }
 
   /* ── SCHEDULE TABLE ── */
   .schedule-table-wrap {
@@ -694,6 +699,10 @@
 
 <main>
   <div id="tab-schedule"  class="tab-panel active">
+    <div class="schedule-filters" id="schedule-view-toggle">
+      <button class="filter-btn active" id="sched-btn-tournament" onclick="setScheduleView('tournament',this)">This Tournament</button>
+      <button class="filter-btn"        id="sched-btn-all"        onclick="setScheduleView('all',this)">All Tournaments</button>
+    </div>
     <div class="schedule-filters" id="schedule-filters">
       <!-- dynamically populated -->
     </div>
@@ -903,17 +912,32 @@ function renderAll() {
 }
 
 // ── SCHEDULE ──────────────────────────────────────────────────────────
+let scheduleView = 'tournament'; // 'tournament' | 'all'
+
+function setScheduleView(mode, btn) {
+  scheduleView = mode;
+  document.querySelectorAll('#schedule-view-toggle .filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  activeFilter = 'all';
+  renderSchedule();
+}
+
 function filterSchedule(pool, btn) {
   activeFilter = pool;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#schedule-filters .filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   renderScheduleTable();
 }
 
 function renderSchedule() {
-  const tgames = tournamentGames();
+  const showAll = scheduleView === 'all';
+  const tgames  = showAll ? allGames : tournamentGames();
 
-  // Build dynamic filter buttons from pools in this tournament
+  // Sync view toggle button states
+  document.getElementById('sched-btn-tournament')?.classList.toggle('active', !showAll);
+  document.getElementById('sched-btn-all')?.classList.toggle('active', showAll);
+
+  // Build dynamic filter buttons from pools in scope
   const filtersEl = document.getElementById('schedule-filters');
   const seenPools = [];
   let hasKnockouts = false;
@@ -936,7 +960,8 @@ function renderSchedule() {
 }
 
 function renderScheduleTable() {
-  let games = tournamentGames();
+  const showAll = scheduleView === 'all';
+  let games = showAll ? allGames : tournamentGames();
   if (activeFilter === 'Knockouts') games = games.filter(g => isKnockout(g.pool));
   else if (activeFilter !== 'all')  games = games.filter(g => g.pool === activeFilter);
 
@@ -944,10 +969,19 @@ function renderScheduleTable() {
     document.getElementById('schedule-content').innerHTML = '<div class="no-data">No games found</div>'; return;
   }
 
+  // ── All-tournaments header ──
+  let headerHtml = '';
+  if (showAll) {
+    headerHtml = `<div class="pitch-all-header">
+      <span class="pitch-all-title">All Tournaments — Full Schedule</span>
+    </div>`;
+  }
+
   // ── Desktop table ──
+  const tournCol = showAll ? '<th>Tournament</th>' : '';
   let tableHtml = `<div class="schedule-table-wrap"><table class="schedule-table">
     <thead><tr>
-      <th>Time</th><th>Pitch</th><th>Pool</th>
+      <th>Time</th><th>Pitch</th>${tournCol}<th>Pool</th>
       <th>Home</th><th class="center">Score</th><th>Away</th><th>Referee</th>
     </tr></thead><tbody>`;
 
@@ -969,9 +1003,14 @@ function renderScheduleTable() {
          </div>`
       : `<span class="score-tbd">vs</span>`;
 
+    const tournCell = showAll
+      ? `<td style="font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--muted);letter-spacing:.05em;white-space:nowrap">${g.tournament}</td>`
+      : '';
+
     tableHtml += `<tr>
       <td style="color:var(--muted);font-family:'Barlow Condensed',sans-serif;letter-spacing:.05em">${g.time||'—'}</td>
       <td style="color:var(--muted);font-family:'Barlow Condensed',sans-serif">${g.pitch||'—'}</td>
+      ${tournCell}
       <td>${poolPill(g.pool)}</td>
       <td><span style="font-weight:600;${winA?'color:var(--yellow)':''}">${g.teamA}</span></td>
       <td style="text-align:center">${scoreHtml}</td>
@@ -988,11 +1027,16 @@ function renderScheduleTable() {
          </div>`
       : `<span class="score-tbd">vs</span>`;
 
+    const tournBadge = showAll
+      ? `<div class="gb-tournament" style="margin-right:auto">${g.tournament}</div>`
+      : '';
+
     cardsHtml += `<div class="sched-card">
       <div class="sched-card-meta">
         <div class="sched-card-meta-left">
           ${g.time ? `<span class="sched-card-time">${g.time}</span>` : ''}
           ${g.pitch ? `<span class="sched-card-pitch">📍 ${g.pitch}</span>` : ''}
+          ${tournBadge}
         </div>
         <div>${poolPill(g.pool)}</div>
       </div>
@@ -1008,7 +1052,7 @@ function renderScheduleTable() {
   tableHtml += '</tbody></table></div>';
   cardsHtml  += '</div>';
 
-  document.getElementById('schedule-content').innerHTML = tableHtml + cardsHtml;
+  document.getElementById('schedule-content').innerHTML = headerHtml + tableHtml + cardsHtml;
 }
 
 // ── STANDINGS ─────────────────────────────────────────────────────────
