@@ -262,7 +262,8 @@
   #pitch-btn-all.active { background: var(--yellow); color: var(--navy); border-color: var(--yellow); }
 
   /* ── SCHEDULE TABLE ── */
-  .schedule-table { width: 100%; border-collapse: collapse; }
+  .schedule-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .schedule-table { width: 100%; border-collapse: collapse; min-width: 640px; }
 
   .schedule-table thead tr { border-bottom: 2px solid rgba(245,200,0,0.2); }
 
@@ -877,7 +878,7 @@ function renderScheduleTable() {
     document.getElementById('schedule-content').innerHTML = '<div class="no-data">No games found</div>'; return;
   }
 
-  let html = `<table class="schedule-table">
+  let html = `<div class="schedule-table-wrap"><table class="schedule-table">
     <thead><tr>
       <th>Time</th><th>Pitch</th><th>Pool</th>
       <th>Home</th><th class="center">Score</th><th>Away</th><th>Referee</th>
@@ -908,7 +909,7 @@ function renderScheduleTable() {
     </tr>`;
   }
 
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   document.getElementById('schedule-content').innerHTML = html;
 }
 
