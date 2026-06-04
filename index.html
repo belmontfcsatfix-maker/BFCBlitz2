@@ -258,6 +258,8 @@
   .filter-btn[data-pool="Pool B"].active   { background: var(--pool-b); }
   .filter-btn[data-pool="Pool C"].active   { background: var(--pool-c); }
   .filter-btn[data-pool="Knockouts"].active{ background: var(--yellow); }
+  #pitch-btn-tournament.active,
+  #pitch-btn-all.active { background: var(--yellow); color: var(--navy); border-color: var(--yellow); }
 
   /* ── SCHEDULE TABLE ── */
   .schedule-table { width: 100%; border-collapse: collapse; }
@@ -400,6 +402,15 @@
   .match-label.sf    { background: rgba(52,211,153,0.12); color: var(--sf-color); }
   .match-label.final { background: rgba(245,200,0,0.14);  color: var(--yellow); }
   .match-label.third { background: rgba(200,200,200,0.08); color: #aaa; }
+
+  .match-meta {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); text-align: center;
+    padding: 4px 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    background: rgba(0,0,0,0.15);
+  }
 
   .match-team {
     display: flex; align-items: center; justify-content: space-between;
@@ -983,8 +994,12 @@ function renderBracket() {
     const sA = has ? parseInt(game.scoreA) : null;
     const sB = has ? parseInt(game.scoreB) : null;
     const wA = has && sA > sB, wB = has && sB > sA;
+    const meta = (game.time || game.pitch)
+      ? `<div class="match-meta">${[game.time, game.pitch].filter(Boolean).join(' · ')}</div>`
+      : '';
     return `<div class="match-card ${ccls}">
       <div class="match-label ${lcls}">${label}</div>
+      ${meta}
       <div class="match-team">
         <div><strong>${game.teamA||'TBD'}</strong></div>
         <div class="mscore ${wA?'winner':''}">${has?sA:'–'}</div>
