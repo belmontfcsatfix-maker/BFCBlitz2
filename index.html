@@ -35,7 +35,6 @@
     background: var(--navy);
     color: var(--white);
     min-height: 100vh;
-    overflow-x: hidden;
   }
 
   body::before {
@@ -262,8 +261,18 @@
   #pitch-btn-all.active { background: var(--yellow); color: var(--navy); border-color: var(--yellow); }
 
   /* ── SCHEDULE TABLE ── */
-  .schedule-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .schedule-table { width: 100%; border-collapse: collapse; min-width: 640px; }
+  .schedule-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+  .schedule-table {
+    border-collapse: collapse;
+    min-width: 660px;
+    width: 100%;
+  }
+  .schedule-table th,
+  .schedule-table td { white-space: nowrap; }
 
   .schedule-table thead tr { border-bottom: 2px solid rgba(245,200,0,0.2); }
 
