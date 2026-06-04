@@ -144,7 +144,7 @@
     position: relative; z-index: 10;
     display: flex; align-items: center; justify-content: center;
     gap: 8px; flex-wrap: wrap;
-    padding: 12px 20px;
+    padding: 10px 20px;
     background: rgba(245,200,0,0.03);
     border-bottom: 1px solid rgba(245,200,0,0.12);
   }
@@ -152,7 +152,7 @@
   .tourn-label {
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase;
-    color: var(--muted); margin-right: 4px;
+    color: var(--muted); margin-right: 4px; flex-shrink: 0;
   }
 
   .tourn-btn {
@@ -169,6 +169,48 @@
     background: var(--yellow); color: var(--navy);
     border-color: var(--yellow);
     box-shadow: 0 0 18px rgba(245,200,0,0.3);
+  }
+
+  .tourn-action-btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 5px 13px; border-radius: 4px;
+    border: 1px solid rgba(245,200,0,0.2);
+    background: transparent; color: var(--muted);
+    cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+  }
+  .tourn-action-btn:hover { color: var(--yellow); border-color: rgba(245,200,0,0.5); }
+
+  .tourn-divider {
+    width: 1px; height: 20px;
+    background: rgba(255,255,255,0.1); flex-shrink: 0;
+  }
+
+  /* ── TOURNAMENT SECTION HEADER ── */
+  .tourn-section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin: 28px 0 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(245,200,0,0.2);
+  }
+  .tourn-section-header:first-child { margin-top: 0; }
+  .tourn-section-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(245,200,0,0.12);
+    border: 1px solid rgba(245,200,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+  }
+  .tourn-section-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.15rem; font-weight: 800;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--yellow);
+  }
+  .tourn-section-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--muted); margin-left: auto;
   }
 
   /* ── PITCH ALL-TOURNAMENT HEADER ── */
@@ -257,16 +299,6 @@
   .filter-btn[data-pool="Pool B"].active   { background: var(--pool-b); }
   .filter-btn[data-pool="Pool C"].active   { background: var(--pool-c); }
   .filter-btn[data-pool="Knockouts"].active{ background: var(--yellow); }
-  #pitch-btn-tournament.active,
-  #pitch-btn-all.active,
-  #sched-btn-tournament.active,
-  #sched-btn-all.active {
-    background: var(--yellow) !important;
-    color: var(--navy) !important;
-    border-color: var(--yellow) !important;
-    font-weight: 700;
-  }
-
   #schedule-view-toggle { margin-bottom: 0; }
   #schedule-filters { margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); }
 
@@ -704,13 +736,7 @@
 
 <main>
   <div id="tab-schedule"  class="tab-panel active">
-    <div class="schedule-filters" id="schedule-view-toggle">
-      <button class="filter-btn active" id="sched-btn-tournament" onclick="setScheduleView('tournament',this)">This Tournament</button>
-      <button class="filter-btn"        id="sched-btn-all"        onclick="setScheduleView('all',this)">All Tournaments</button>
-    </div>
-    <div class="schedule-filters" id="schedule-filters">
-      <!-- dynamically populated -->
-    </div>
+    <div class="schedule-filters" id="schedule-filters"><!-- dynamically populated --></div>
     <div id="schedule-content"><div class="loading"><div class="spinner"></div>Loading schedule…</div></div>
   </div>
 
@@ -723,10 +749,6 @@
   </div>
 
   <div id="tab-pitches"   class="tab-panel">
-    <div class="schedule-filters" id="pitch-filters">
-      <button class="filter-btn active" id="pitch-btn-tournament" onclick="setPitchView('tournament',this)">This Tournament</button>
-      <button class="filter-btn"        id="pitch-btn-all"        onclick="setPitchView('all',this)">All Tournaments</button>
-    </div>
     <div id="pitches-content"><div class="loading"><div class="spinner"></div>Loading pitch allocation…</div></div>
   </div>
 </main>
@@ -738,7 +760,7 @@ const CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?form
 
 let allGames = [];
 let activeFilter = 'all';
-let activeTournament = null; // null = auto-select first tournament
+let selectedTournaments = new Set(); // empty = all selected
 
 // ── TABS ─────────────────────────────────────────────────────────────
 function showTab(name, btn) {
@@ -868,16 +890,47 @@ function getTournaments() {
   return list;
 }
 
-function tournamentGames() {
-  if (!activeTournament) return allGames;
-  return allGames.filter(g => g.tournament === activeTournament);
+// Returns games for the current selection (empty selectedTournaments = all)
+function selectedGames() {
+  if (!selectedTournaments.size) return allGames;
+  return allGames.filter(g => selectedTournaments.has(g.tournament));
 }
 
-function selectTournament(name, btn) {
-  activeTournament = name;
-  document.querySelectorAll('.tourn-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  activeFilter = 'all'; // reset pool filter when switching tournament
+// Returns ordered array of active tournament names
+function activeTournamentList() {
+  const all = getTournaments();
+  if (!selectedTournaments.size) return all;
+  return all.filter(t => selectedTournaments.has(t));
+}
+
+function toggleTournament(name) {
+  const all = getTournaments();
+  if (selectedTournaments.has(name)) {
+    // Don't allow deselecting if it's the only one selected
+    if (selectedTournaments.size === 1) return;
+    selectedTournaments.delete(name);
+  } else {
+    selectedTournaments.add(name);
+  }
+  activeFilter = 'all';
+  renderTournamentSelector();
+  renderAll();
+}
+
+function selectAllTournaments() {
+  selectedTournaments.clear();
+  activeFilter = 'all';
+  renderTournamentSelector();
+  renderAll();
+}
+
+function clearAllTournaments() {
+  // Select only the first one (must always have at least one)
+  const all = getTournaments();
+  if (!all.length) return;
+  selectedTournaments = new Set([all[0]]);
+  activeFilter = 'all';
+  renderTournamentSelector();
   renderAll();
 }
 
@@ -887,24 +940,27 @@ function renderTournamentSelector() {
   if (!container) return;
 
   if (tournaments.length <= 1) {
-    // Only one tournament — hide selector, auto-select
     container.style.display = 'none';
-    activeTournament = tournaments[0] || null;
+    if (tournaments.length === 1) selectedTournaments = new Set([tournaments[0]]);
     return;
   }
 
   container.style.display = 'flex';
 
-  // Auto-select first if nothing selected or selection no longer valid
-  if (!activeTournament || !tournaments.includes(activeTournament)) {
-    activeTournament = tournaments[0];
-  }
+  // Default: all selected (empty set = all)
+  const allSelected = !selectedTournaments.size ||
+    tournaments.every(t => selectedTournaments.has(t));
+  if (allSelected) selectedTournaments.clear(); // normalise to empty = all
 
-  let html = '<span class="tourn-label">Tournament:</span>';
+  let html = '<span class="tourn-label">Tournaments:</span>';
   for (const t of tournaments) {
-    const isActive = t === activeTournament;
-    html += `<button class="tourn-btn${isActive ? ' active' : ''}" onclick="selectTournament('${t.replace(/'/g,"\\'")}',this)">${t}</button>`;
+    const isActive = !selectedTournaments.size || selectedTournaments.has(t);
+    const safe = t.replace(/'/g, "\\'");
+    html += `<button class="tourn-btn${isActive ? ' active' : ''}" onclick="toggleTournament('${safe}')">${t}</button>`;
   }
+  html += '<div class="tourn-divider"></div>';
+  html += `<button class="tourn-action-btn" onclick="selectAllTournaments()">Select All</button>`;
+  html += `<button class="tourn-action-btn" onclick="clearAllTournaments()">Clear</button>`;
   container.innerHTML = html;
 }
 
@@ -917,16 +973,6 @@ function renderAll() {
 }
 
 // ── SCHEDULE ──────────────────────────────────────────────────────────
-let scheduleView = 'tournament'; // 'tournament' | 'all'
-
-function setScheduleView(mode, btn) {
-  scheduleView = mode;
-  document.querySelectorAll('#schedule-view-toggle .filter-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  activeFilter = 'all';
-  renderSchedule();
-}
-
 function filterSchedule(pool, btn) {
   activeFilter = pool;
   document.querySelectorAll('#schedule-filters .filter-btn').forEach(b => b.classList.remove('active'));
@@ -935,20 +981,16 @@ function filterSchedule(pool, btn) {
 }
 
 function renderSchedule() {
-  const showAll = scheduleView === 'all';
-  const tgames  = showAll ? allGames : tournamentGames();
+  const games = selectedGames();
+  const tournList = activeTournamentList();
+  const multi = tournList.length > 1;
 
-  // Sync view toggle button states
-  document.getElementById('sched-btn-tournament')?.classList.toggle('active', !showAll);
-  document.getElementById('sched-btn-all')?.classList.toggle('active', showAll);
-
-  // Build dynamic filter buttons from pools in scope
-  const filtersEl = document.getElementById('schedule-filters');
+  // Build pool filter from all visible games
   const seenPools = [];
   let hasKnockouts = false;
-  for (const g of tgames) {
-    if (isKnockout(g.pool)) { hasKnockouts = true; }
-    else if (!seenPools.includes(g.pool) && g.pool) { seenPools.push(g.pool); }
+  for (const g of games) {
+    if (isKnockout(g.pool)) hasKnockouts = true;
+    else if (g.pool && !seenPools.includes(g.pool)) seenPools.push(g.pool);
   }
 
   let filterHtml = `<button class="filter-btn${activeFilter==='all'?' active':''}" data-pool="all" onclick="filterSchedule('all',this)">All Games</button>`;
@@ -959,124 +1001,130 @@ function renderSchedule() {
   if (hasKnockouts) {
     filterHtml += `<button class="filter-btn${activeFilter==='Knockouts'?' active':''}" data-pool="Knockouts" onclick="filterSchedule('Knockouts',this)">Knockouts</button>`;
   }
+  const filtersEl = document.getElementById('schedule-filters');
   if (filtersEl) filtersEl.innerHTML = filterHtml;
 
   renderScheduleTable();
 }
 
 function renderScheduleTable() {
-  const showAll = scheduleView === 'all';
-  let games = showAll ? allGames : tournamentGames();
-  if (activeFilter === 'Knockouts') games = games.filter(g => isKnockout(g.pool));
-  else if (activeFilter !== 'all')  games = games.filter(g => g.pool === activeFilter);
+  const tournList = activeTournamentList();
+  const multi = tournList.length > 1;
 
-  if (!games.length) {
-    document.getElementById('schedule-content').innerHTML = '<div class="no-data">No games found</div>'; return;
+  let allFiltered = selectedGames();
+  if (activeFilter === 'Knockouts') allFiltered = allFiltered.filter(g => isKnockout(g.pool));
+  else if (activeFilter !== 'all')  allFiltered = allFiltered.filter(g => g.pool === activeFilter);
+
+  if (!allFiltered.length) {
+    document.getElementById('schedule-content').innerHTML = '<div class="no-data">No games found</div>';
+    return;
   }
 
-  // ── All-tournaments header ──
-  let headerHtml = '';
-  if (showAll) {
-    headerHtml = `<div class="pitch-all-header">
-      <span class="pitch-all-title">All Tournaments — Full Schedule</span>
-    </div>`;
-  }
+  let html = '';
+  // Group by tournament when multiple selected
+  const groups = multi
+    ? tournList.map(t => ({ tourn: t, games: allFiltered.filter(g => g.tournament === t) })).filter(gr => gr.games.length)
+    : [{ tourn: null, games: allFiltered }];
 
-  // ── Desktop table ──
-  const tournCol = showAll ? '<th>Tournament</th>' : '';
-  let tableHtml = `<div class="schedule-table-wrap"><table class="schedule-table">
-    <thead><tr>
-      <th>Time</th><th>Pitch</th>${tournCol}<th>Pool</th>
-      <th>Home</th><th class="center">Score</th><th>Away</th><th>Referee</th>
-    </tr></thead><tbody>`;
+  for (const { tourn, games } of groups) {
+    if (tourn) {
+      html += `<div class="tourn-section-header">
+        <div class="tourn-section-icon">🏆</div>
+        <span class="tourn-section-name">${tourn}</span>
+        <span class="tourn-section-count">${games.length} game${games.length!==1?'s':''}</span>
+      </div>`;
+    }
 
-  // ── Mobile cards ──
-  let cardsHtml = `<div class="schedule-cards">`;
+    // Desktop table
+    html += `<div class="schedule-table-wrap"><table class="schedule-table">
+      <thead><tr>
+        <th>Time</th><th>Pitch</th><th>Pool</th>
+        <th>Home</th><th class="center">Score</th><th>Away</th><th>Referee</th>
+      </tr></thead><tbody>`;
 
-  for (const g of games) {
-    const has = g.scoreA !== '' && g.scoreB !== '';
-    const sA = has ? parseInt(g.scoreA) : null;
-    const sB = has ? parseInt(g.scoreB) : null;
-    const winA = has && sA > sB, winB = has && sB > sA;
+    // Mobile cards
+    html += `<div class="schedule-cards" style="display:none">`;
 
-    // Table row
-    const scoreHtml = has
-      ? `<div class="score-box">
-          <span class="score-num ${winA?'winner':sA<sB?'loser':''}">${sA}</span>
-          <span class="score-sep">–</span>
-          <span class="score-num ${winB?'winner':sB<sA?'loser':''}">${sB}</span>
-         </div>`
-      : `<span class="score-tbd">vs</span>`;
+    for (const g of games) {
+      const has = g.scoreA !== '' && g.scoreB !== '';
+      const sA = has ? parseInt(g.scoreA) : null;
+      const sB = has ? parseInt(g.scoreB) : null;
+      const winA = has && sA > sB, winB = has && sB > sA;
 
-    const tournCell = showAll
-      ? `<td style="font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--muted);letter-spacing:.05em;white-space:nowrap">${g.tournament}</td>`
-      : '';
+      const scoreHtml = has
+        ? `<div class="score-box">
+            <span class="score-num ${winA?'winner':sA<sB?'loser':''}">${sA}</span>
+            <span class="score-sep">–</span>
+            <span class="score-num ${winB?'winner':sB<sA?'loser':''}">${sB}</span>
+           </div>`
+        : `<span class="score-tbd">vs</span>`;
 
-    tableHtml += `<tr>
-      <td style="color:var(--muted);font-family:'Barlow Condensed',sans-serif;letter-spacing:.05em">${g.time||'—'}</td>
-      <td style="color:var(--muted);font-family:'Barlow Condensed',sans-serif">${g.pitch||'—'}</td>
-      ${tournCell}
-      <td>${poolPill(g.pool)}</td>
-      <td><span style="font-weight:600;${winA?'color:var(--yellow)':''}">${g.teamA}</span></td>
-      <td style="text-align:center">${scoreHtml}</td>
-      <td><span style="font-weight:600;${winB?'color:var(--yellow)':''}">${g.teamB}</span></td>
-      <td style="color:var(--muted);font-size:.8rem">${g.referee||''}</td>
-    </tr>`;
+      html += `<tr>
+        <td style="color:var(--muted);font-family:'Barlow Condensed',sans-serif;letter-spacing:.05em">${g.time||'—'}</td>
+        <td style="color:var(--muted);font-family:'Barlow Condensed',sans-serif">${g.pitch||'—'}</td>
+        <td>${poolPill(g.pool)}</td>
+        <td><span style="font-weight:600;${winA?'color:var(--yellow)':''}">${g.teamA}</span></td>
+        <td style="text-align:center">${scoreHtml}</td>
+        <td><span style="font-weight:600;${winB?'color:var(--yellow)':''}">${g.teamB}</span></td>
+        <td style="color:var(--muted);font-size:.8rem">${g.referee||''}</td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>`;
 
-    // Mobile card
-    const cardScore = has
-      ? `<div class="sched-card-score">
-          <span class="score-num ${winA?'winner':sA<sB?'loser':''}">${sA}</span>
-          <span class="score-sep">–</span>
-          <span class="score-num ${winB?'winner':sB<sA?'loser':''}">${sB}</span>
-         </div>`
-      : `<span class="score-tbd">vs</span>`;
-
-    const tournBadge = showAll
-      ? `<div class="gb-tournament" style="margin-right:auto">${g.tournament}</div>`
-      : '';
-
-    cardsHtml += `<div class="sched-card">
-      <div class="sched-card-meta">
-        <div class="sched-card-meta-left">
-          ${g.time ? `<span class="sched-card-time">${g.time}</span>` : ''}
-          ${g.pitch ? `<span class="sched-card-pitch">📍 ${g.pitch}</span>` : ''}
-          ${tournBadge}
+    // Close and reopen cards div properly — build cards separately
+    let cardsHtml = `<div class="schedule-cards">`;
+    for (const g of games) {
+      const has = g.scoreA !== '' && g.scoreB !== '';
+      const sA = has ? parseInt(g.scoreA) : null;
+      const sB = has ? parseInt(g.scoreB) : null;
+      const winA = has && sA > sB, winB = has && sB > sA;
+      const cardScore = has
+        ? `<div class="sched-card-score">
+            <span class="score-num ${winA?'winner':sA<sB?'loser':''}">${sA}</span>
+            <span class="score-sep">–</span>
+            <span class="score-num ${winB?'winner':sB<sA?'loser':''}">${sB}</span>
+           </div>`
+        : `<span class="score-tbd">vs</span>`;
+      cardsHtml += `<div class="sched-card">
+        <div class="sched-card-meta">
+          <div class="sched-card-meta-left">
+            ${g.time ? `<span class="sched-card-time">${g.time}</span>` : ''}
+            ${g.pitch ? `<span class="sched-card-pitch">📍 ${g.pitch}</span>` : ''}
+          </div>
+          <div>${poolPill(g.pool)}</div>
         </div>
-        <div>${poolPill(g.pool)}</div>
-      </div>
-      <div class="sched-card-body">
-        <div class="sched-card-team home ${winA?'winner':''}">${g.teamA}</div>
-        ${cardScore}
-        <div class="sched-card-team away ${winB?'winner':''}">${g.teamB}</div>
-      </div>
-      ${g.referee ? `<div class="sched-card-ref">🟡 ${g.referee}</div>` : ''}
-    </div>`;
+        <div class="sched-card-body">
+          <div class="sched-card-team home ${winA?'winner':''}">${g.teamA}</div>
+          ${cardScore}
+          <div class="sched-card-team away ${winB?'winner':''}">${g.teamB}</div>
+        </div>
+        ${g.referee ? `<div class="sched-card-ref">🟡 ${g.referee}</div>` : ''}
+      </div>`;
+    }
+    cardsHtml += `</div>`;
+    html += cardsHtml;
   }
 
-  tableHtml += '</tbody></table></div>';
-  cardsHtml  += '</div>';
-
-  document.getElementById('schedule-content').innerHTML = headerHtml + tableHtml + cardsHtml;
+  document.getElementById('schedule-content').innerHTML = html;
 }
 
 // ── STANDINGS ─────────────────────────────────────────────────────────
-function computeStandings(pool) {
-  const tgames = tournamentGames();
+function computeStandings(pool, games) {
   const teams = {};
-  tgames.filter(g => g.pool === pool).forEach(g => {
-    if (!teams[g.teamA]) teams[g.teamA] = { team:g.teamA, mp:0,w:0,d:0,l:0,gf:0,ga:0 };
-    if (!teams[g.teamB]) teams[g.teamB] = { team:g.teamB, mp:0,w:0,d:0,l:0,gf:0,ga:0 };
-  });
-  tgames.filter(g => g.pool === pool && g.scoreA !== '' && g.scoreB !== '').forEach(g => {
-    const sA = parseInt(g.scoreA), sB = parseInt(g.scoreB);
-    const ta = teams[g.teamA], tb = teams[g.teamB];
-    ta.mp++; tb.mp++;
-    ta.gf += sA; ta.ga += sB; tb.gf += sB; tb.ga += sA;
-    if (sA > sB)      { ta.w++; tb.l++; }
-    else if (sA < sB) { tb.w++; ta.l++; }
-    else              { ta.d++; tb.d++; }
-  });
+  for (const g of games) {
+    if (g.pool !== pool || !g.teamA || !g.teamB) continue;
+    if (!teams[g.teamA]) teams[g.teamA] = {team:g.teamA,mp:0,w:0,d:0,l:0,gf:0,ga:0};
+    if (!teams[g.teamB]) teams[g.teamB] = {team:g.teamB,mp:0,w:0,d:0,l:0,gf:0,ga:0};
+    if (g.scoreA !== '' && g.scoreB !== '') {
+      const sA = parseInt(g.scoreA), sB = parseInt(g.scoreB);
+      teams[g.teamA].mp++; teams[g.teamB].mp++;
+      teams[g.teamA].gf += sA; teams[g.teamA].ga += sB;
+      teams[g.teamB].gf += sB; teams[g.teamB].ga += sA;
+      if (sA > sB)      { teams[g.teamA].w++; teams[g.teamB].l++; }
+      else if (sA < sB) { teams[g.teamB].w++; teams[g.teamA].l++; }
+      else              { teams[g.teamA].d++; teams[g.teamB].d++; }
+    }
+  }
   return Object.values(teams).sort((a,b) => {
     const pa = a.w*3+a.d, pb = b.w*3+b.d;
     if (pa !== pb) return pb - pa;
@@ -1086,20 +1134,18 @@ function computeStandings(pool) {
   });
 }
 
-function renderStandings() {
-  const tgames = tournamentGames();
-  // Derive pools dynamically (non-knockout pools) in order of first appearance
+function standingsBlockHTML(games) {
   const seenPools = [];
-  for (const g of tgames) {
-    if (!isKnockout(g.pool) && !seenPools.includes(g.pool)) seenPools.push(g.pool);
+  for (const g of games) {
+    if (!isKnockout(g.pool) && g.pool && !seenPools.includes(g.pool)) seenPools.push(g.pool);
   }
-  const pools = seenPools.length ? seenPools : ['Pool A','Pool B','Pool C'];
+  if (!seenPools.length) return '<div class="no-data">No pool stage games found.</div>';
   const colorVars = ['pool-a','pool-b','pool-c','pool-d','pool-e'];
   const cc = {};
-  pools.forEach((p, i) => { cc[p] = colorVars[i % colorVars.length]; });
+  seenPools.forEach((p,i) => { cc[p] = colorVars[i % colorVars.length]; });
   let html = '<div class="standings-grid">';
-  for (const pool of pools) {
-    const rows = computeStandings(pool);
+  for (const pool of seenPools) {
+    const rows = computeStandings(pool, games);
     html += `<div class="pool-card">
       <div class="pool-card-header ${cc[pool]}"><span>⚽</span> ${pool}</div>
       <table class="standings-tbl">
@@ -1121,20 +1167,35 @@ function renderStandings() {
         <td class="td-pts">${pts}</td>
       </tr>`;
     });
-    html += `</tbody></table>
-    </div>`;
+    html += `</tbody></table></div>`;
   }
   html += '</div>';
-  document.getElementById('standings-content').innerHTML = html;
+  return html;
+}
+
+function renderStandings() {
+  const tournList = activeTournamentList();
+  const multi = tournList.length > 1;
+  let html = '';
+  for (const t of tournList) {
+    const games = allGames.filter(g => g.tournament === t);
+    if (multi) {
+      html += `<div class="tourn-section-header">
+        <div class="tourn-section-icon">🏆</div>
+        <span class="tourn-section-name">${t}</span>
+      </div>`;
+    }
+    html += standingsBlockHTML(games);
+  }
+  document.getElementById('standings-content').innerHTML = html || '<div class="no-data">No data</div>';
 }
 
 // ── BRACKET ───────────────────────────────────────────────────────────
-function renderBracket() {
-  const tgames = tournamentGames();
-  const sf1 = tgames.find(g => g.pool === 'Semi Final 1') || {};
-  const sf2 = tgames.find(g => g.pool === 'Semi Final 2') || {};
-  const fin = tgames.find(g => g.pool === 'Final') || {};
-  const thd = tgames.find(g => g.pool && (g.pool.toLowerCase().includes('third') || g.pool.toLowerCase().includes('plance'))) || {};
+function bracketHTML(tourn, games) {
+  const sf1 = games.find(g => g.pool === 'Semi Final 1') || {};
+  const sf2 = games.find(g => g.pool === 'Semi Final 2') || {};
+  const fin = games.find(g => g.pool === 'Final') || {};
+  const thd = games.find(g => g.pool && (g.pool.toLowerCase().includes('third') || g.pool.toLowerCase().includes('plance'))) || {};
 
   function mcard(label, lcls, game, ccls='') {
     const has = game.scoreA && game.scoreB;
@@ -1158,7 +1219,14 @@ function renderBracket() {
     </div>`;
   }
 
-  document.getElementById('bracket-content').innerHTML = `
+  const header = tourn
+    ? `<div class="tourn-section-header">
+        <div class="tourn-section-icon">🏆</div>
+        <span class="tourn-section-name">${tourn}</span>
+       </div>`
+    : '';
+
+  return `${header}
   <div class="bracket-wrap">
     <div class="section-title">Semi Finals &amp; Final</div>
     <div class="bracket">
@@ -1179,16 +1247,18 @@ function renderBracket() {
   </div>`;
 }
 
-// ── PITCH ALLOCATION ──────────────────────────────────────────────────
-let pitchView = 'tournament'; // 'tournament' | 'all'
-
-function setPitchView(mode, btn) {
-  pitchView = mode;
-  document.querySelectorAll('#pitch-filters .filter-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  renderPitches();
+function renderBracket() {
+  const tournList = activeTournamentList();
+  const multi = tournList.length > 1;
+  let html = '';
+  for (const t of tournList) {
+    const games = allGames.filter(g => g.tournament === t);
+    html += bracketHTML(multi ? t : null, games);
+  }
+  document.getElementById('bracket-content').innerHTML = html || '<div class="no-data">No data</div>';
 }
 
+// ── PITCH ALLOCATION ──────────────────────────────────────────────────
 function parseTime(t) {
   if (!t) return 9999;
   const clean = t.trim().toUpperCase();
@@ -1207,21 +1277,17 @@ function parseTime(t) {
 function buildPitchGrid(games) {
   const gamesWithPitch = games.filter(g => g.pitch && g.pitch !== '');
   if (!gamesWithPitch.length) return null;
-
   const pitches = [...new Set(gamesWithPitch.map(g => g.pitch))].sort();
   const times   = [...new Set(games.filter(g => g.time && g.time !== '').map(g => g.time))]
-                  .sort((a, b) => parseTime(a) - parseTime(b));
-
+                  .sort((a,b) => parseTime(a) - parseTime(b));
   const grid = {};
   for (const t of times) {
     grid[t] = {};
     for (const p of pitches) grid[t][p] = null;
   }
   for (const g of games) {
-    if (g.time && g.pitch && grid[g.time] !== undefined) {
-      // If multiple games share same time+pitch, keep an array
-      if (!grid[g.time][g.pitch]) grid[g.time][g.pitch] = g;
-      // else: first-come wins (shouldn't happen in valid data)
+    if (g.time && g.pitch && grid[g.time] !== undefined && !grid[g.time][g.pitch]) {
+      grid[g.time][g.pitch] = g;
     }
   }
   return { pitches, times, grid };
@@ -1230,84 +1296,70 @@ function buildPitchGrid(games) {
 function pitchGridHTML(data, showTournament) {
   const { pitches, times, grid } = data;
   const colTemplate = `80px ${pitches.map(() => '1fr').join(' ')}`;
-
-  let html = `<div class="pitch-grid-wrap">
-    <div class="pitch-grid" style="grid-template-columns:${colTemplate}">`;
-
+  let html = `<div class="pitch-grid-wrap"><div class="pitch-grid" style="grid-template-columns:${colTemplate}">`;
   html += `<div class="pg-corner">Time / Pitch</div>`;
   for (const p of pitches) html += `<div class="pg-pitch-head">📍 ${p}</div>`;
-
   for (const t of times) {
     html += `<div class="pg-time-label">${t}</div>`;
     for (const p of pitches) {
       const g = grid[t][p];
       if (g) {
         const bc = poolBlockClass(g.pool);
-        const tournBadge = showTournament
-          ? `<div class="gb-tournament">${g.tournament}</div>`
-          : '';
-        html += `<div class="pg-cell">
-          <div class="game-block ${bc}">
-            ${tournBadge}
-            <div class="gb-teams">${g.teamA}</div>
-            <div class="gb-vs">vs</div>
-            <div class="gb-teams">${g.teamB}</div>
-            ${poolPillInline(g.pool)}
-          </div>
-        </div>`;
+        const tournBadge = showTournament ? `<div class="gb-tournament">${g.tournament}</div>` : '';
+        html += `<div class="pg-cell"><div class="game-block ${bc}">
+          ${tournBadge}
+          <div class="gb-teams">${g.teamA}</div>
+          <div class="gb-vs">vs</div>
+          <div class="gb-teams">${g.teamB}</div>
+          ${poolPillInline(g.pool)}
+        </div></div>`;
       } else {
         html += `<div class="pg-cell"><span class="empty-cell-txt">—</span></div>`;
       }
     }
   }
-
   html += '</div></div>';
   return html;
 }
 
 function renderPitches() {
-  const showAll = pitchView === 'all';
-  const games   = showAll ? allGames : tournamentGames();
-
-  // Sync filter button states (in case renderAll is called)
-  document.getElementById('pitch-btn-tournament')?.classList.toggle('active', !showAll);
-  document.getElementById('pitch-btn-all')?.classList.toggle('active', showAll);
-
-  const data = buildPitchGrid(games);
-
-  if (!data) {
-    document.getElementById('pitches-content').innerHTML =
-      '<div class="no-data">No pitch or time data found in the sheet yet.<br>Fill in the Time and Pitch columns to see the allocation grid.</div>';
-    return;
-  }
-
+  const tournList = activeTournamentList();
+  const multi = tournList.length > 1;
+  const games = selectedGames();
   let html = '';
 
-  if (showAll) {
-    // All-tournaments view: one grid with tournament badges on each cell
-    html += `<div class="pitch-all-header">
-      <span class="pitch-all-title">All Tournaments — Full Pitch Schedule</span>
-    </div>`;
+  if (multi) {
+    // Combined grid across all selected tournaments (with tournament badge on each cell)
+    const data = buildPitchGrid(games);
+    if (!data) {
+      document.getElementById('pitches-content').innerHTML =
+        '<div class="no-data">No pitch or time data found yet.</div>';
+      return;
+    }
     html += pitchGridHTML(data, true);
   } else {
-    // Single-tournament view: no tournament badge needed
+    // Single tournament — clean grid, no badge needed
+    const data = buildPitchGrid(games);
+    if (!data) {
+      document.getElementById('pitches-content').innerHTML =
+        '<div class="no-data">No pitch or time data found in the sheet yet.<br>Fill in the Time and Pitch columns to see the allocation grid.</div>';
+      return;
+    }
     html += pitchGridHTML(data, false);
   }
 
-  // Dynamic legend from pools present in this view
+  // Legend
   const poolsPresent = [...new Set(games.map(g => g.pool))];
   const regularPools = poolsPresent.filter(p => !isKnockout(p));
   const hasKO = poolsPresent.some(p => isKnockout(p));
-
-  const legendItems = regularPools.map((p, i) => {
-    const colors = ['var(--pool-a)','var(--pool-b)','var(--pool-c)','var(--pool-d, #4fc3f7)'];
+  const legendItems = regularPools.map((p,i) => {
+    const colors = ['var(--pool-a)','var(--pool-b)','var(--pool-c)','var(--pool-d,#4fc3f7)'];
     return { color: colors[i % colors.length], label: p };
   });
   if (hasKO) legendItems.push({ color: 'var(--sf-color)', label: 'Knockouts' });
-
   html += `<div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
     <div class="section-title" style="width:100%">Legend</div>
-    ${legendItems.map(({ color, label }) =>
+    ${legendItems.map(({color,label}) =>
       `<div style="display:flex;align-items:center;gap:7px;font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
         <div style="width:14px;height:14px;border-radius:3px;background:${color};opacity:.85"></div>${label}
       </div>`
