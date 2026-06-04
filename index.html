@@ -706,9 +706,103 @@
 
   @media (max-width:640px) {
     h1 { font-size: 2.1rem; }
-    .tab-btn { padding: 7px 14px; font-size: 0.82rem; }
+    .tab-btn { padding: 7px 12px; font-size: 0.78rem; letter-spacing: 0.08em; }
     .schedule-table th:nth-child(2),
     .schedule-table td:nth-child(2) { display: none; }
+  }
+
+  /* ── COMPREHENSIVE RESPONSIVE FIXES ── */
+
+  /* Pitch grid: always scrollable, never clips */
+  .pitch-grid-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 16px;
+    /* allow scroll even when parent is narrow */
+    margin-left: -4px;
+    margin-right: -4px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .pitch-grid {
+    /* columns set inline by JS — just ensure it doesn't collapse */
+    width: max-content;
+    min-width: 100%;
+  }
+
+  /* On narrow screens shrink pitch cell content */
+  @media (max-width: 768px) {
+    .pg-time-label { font-size: 0.72rem; padding: 0 8px; min-height: 70px; }
+    .pg-corner     { font-size: 0.6rem;  padding: 8px;  }
+    .pg-pitch-head { font-size: 0.72rem; padding: 8px 6px; }
+    .pg-cell       { padding: 5px; min-height: 70px; }
+    .game-block    { padding: 5px 6px; }
+    .game-block .gb-teams { font-size: 0.72rem; }
+    .game-block .gb-vs    { font-size: 0.55rem; }
+  }
+
+  @media (max-width: 480px) {
+    /* Header */
+    header { padding: 20px 14px 16px; }
+    .badge { gap: 10px; }
+    .badge-icon { width: 48px; height: 48px; font-size: 22px; }
+
+    /* Sync bar */
+    .sync-bar { font-size: 0.72rem; padding: 7px 12px; flex-wrap: wrap; gap: 6px; }
+
+    /* Tournament bar */
+    .tournament-bar { padding: 8px 12px; gap: 6px; }
+    .tourn-btn { font-size: 0.78rem; padding: 5px 13px; }
+    .tourn-action-btn { font-size: 0.65rem; padding: 4px 10px; }
+
+    /* Nav tabs */
+    nav { padding: 10px 10px 0; gap: 2px; }
+    .tab-btn { padding: 6px 10px; font-size: 0.72rem; letter-spacing: 0.06em; }
+
+    /* Main padding */
+    main { padding: 16px 12px 50px; }
+
+    /* Filter buttons */
+    .filter-btn { font-size: 0.72rem; padding: 5px 11px; }
+
+    /* Schedule table — hide pitch + referee on very small screens */
+    .schedule-table th:nth-child(2),
+    .schedule-table td:nth-child(2),
+    .schedule-table th:nth-child(7),
+    .schedule-table td:nth-child(7) { display: none; }
+
+    /* Standings — tighten padding */
+    .standings-tbl th,
+    .standings-tbl td { padding: 6px 6px; font-size: 0.78rem; }
+    .rank-badge { width: 18px; height: 18px; font-size: 0.68rem; margin-right: 4px; }
+
+    /* Bracket */
+    .bracket { min-width: 560px; }
+
+    /* Pitch cells even more compact */
+    .pg-time-label { font-size: 0.65rem; padding: 0 5px; min-height: 60px; }
+    .pg-pitch-head { font-size: 0.62rem; padding: 6px 4px; letter-spacing: 0.06em; }
+    .pg-corner     { font-size: 0.55rem; padding: 6px;  }
+    .pg-cell       { padding: 3px; min-height: 60px; }
+    .game-block    { padding: 4px 5px; }
+    .game-block .gb-teams { font-size: 0.65rem; }
+    .game-block .gb-vs    { display: none; }
+    .gb-tournament { font-size: 0.52rem; }
+
+    /* Tournament section headers */
+    .tourn-section-name { font-size: 0.95rem; }
+    .tourn-section-icon { width: 26px; height: 26px; font-size: 12px; }
+  }
+
+  /* Ensure schedule-cards show on mobile, table on desktop */
+  @media (max-width: 640px) {
+    .schedule-table-wrap { display: none !important; }
+    .schedule-cards      { display: flex !important; }
+  }
+  @media (min-width: 641px) {
+    .schedule-cards      { display: none !important; }
+    .schedule-table-wrap { display: block !important; }
   }
 </style>
 </head>
@@ -1026,7 +1120,6 @@ function renderScheduleTable() {
   }
 
   let html = '';
-  // Group by tournament when multiple selected
   const groups = multi
     ? tournList.map(t => ({ tourn: t, games: allFiltered.filter(g => g.tournament === t) })).filter(gr => gr.games.length)
     : [{ tourn: null, games: allFiltered }];
@@ -1040,15 +1133,9 @@ function renderScheduleTable() {
       </div>`;
     }
 
-    // Desktop table
-    html += `<div class="schedule-table-wrap"><table class="schedule-table">
-      <thead><tr>
-        <th>Time</th><th>Pitch</th><th>Pool</th>
-        <th>Home</th><th class="center">Score</th><th>Away</th><th>Referee</th>
-      </tr></thead><tbody>`;
-
-    // Mobile cards
-    html += `<div class="schedule-cards" style="display:none">`;
+    // ── Desktop table ──
+    let tableRows = '';
+    let cardItems = '';
 
     for (const g of games) {
       const has = g.scoreA !== '' && g.scoreB !== '';
@@ -1064,7 +1151,7 @@ function renderScheduleTable() {
            </div>`
         : `<span class="score-tbd">vs</span>`;
 
-      html += `<tr>
+      tableRows += `<tr>
         <td style="color:var(--muted);font-family:'Barlow Condensed',sans-serif;letter-spacing:.05em">${g.time||'—'}</td>
         <td style="color:var(--muted);font-family:'Barlow Condensed',sans-serif">${g.pitch||'—'}</td>
         <td>${poolPill(g.pool)}</td>
@@ -1073,16 +1160,7 @@ function renderScheduleTable() {
         <td><span style="font-weight:600;${winB?'color:var(--yellow)':''}">${g.teamB}</span></td>
         <td style="color:var(--muted);font-size:.8rem">${g.referee||''}</td>
       </tr>`;
-    }
-    html += `</tbody></table></div>`;
 
-    // Close and reopen cards div properly — build cards separately
-    let cardsHtml = `<div class="schedule-cards">`;
-    for (const g of games) {
-      const has = g.scoreA !== '' && g.scoreB !== '';
-      const sA = has ? parseInt(g.scoreA) : null;
-      const sB = has ? parseInt(g.scoreB) : null;
-      const winA = has && sA > sB, winB = has && sB > sA;
       const cardScore = has
         ? `<div class="sched-card-score">
             <span class="score-num ${winA?'winner':sA<sB?'loser':''}">${sA}</span>
@@ -1090,10 +1168,11 @@ function renderScheduleTable() {
             <span class="score-num ${winB?'winner':sB<sA?'loser':''}">${sB}</span>
            </div>`
         : `<span class="score-tbd">vs</span>`;
-      cardsHtml += `<div class="sched-card">
+
+      cardItems += `<div class="sched-card">
         <div class="sched-card-meta">
           <div class="sched-card-meta-left">
-            ${g.time ? `<span class="sched-card-time">${g.time}</span>` : ''}
+            ${g.time  ? `<span class="sched-card-time">${g.time}</span>` : ''}
             ${g.pitch ? `<span class="sched-card-pitch">📍 ${g.pitch}</span>` : ''}
           </div>
           <div>${poolPill(g.pool)}</div>
@@ -1106,8 +1185,14 @@ function renderScheduleTable() {
         ${g.referee ? `<div class="sched-card-ref">🟡 ${g.referee}</div>` : ''}
       </div>`;
     }
-    cardsHtml += `</div>`;
-    html += cardsHtml;
+
+    html += `<div class="schedule-table-wrap"><table class="schedule-table">
+      <thead><tr>
+        <th>Time</th><th>Pitch</th><th>Pool</th>
+        <th>Home</th><th class="center">Score</th><th>Away</th><th>Referee</th>
+      </tr></thead><tbody>${tableRows}</tbody></table></div>`;
+
+    html += `<div class="schedule-cards">${cardItems}</div>`;
   }
 
   document.getElementById('schedule-content').innerHTML = html;
