@@ -172,6 +172,26 @@
     box-shadow: 0 0 18px rgba(245,200,0,0.3);
   }
 
+  /* ── PITCH ALL-TOURNAMENT HEADER ── */
+  .pitch-all-header {
+    padding: 10px 4px 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .pitch-all-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--yellow); opacity: 0.85;
+  }
+
+  /* Tournament badge inside game blocks */
+  .gb-tournament {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
   /* ── NAV ── */
   nav {
     position: relative; z-index: 10;
@@ -611,6 +631,10 @@
   </div>
 
   <div id="tab-pitches"   class="tab-panel">
+    <div class="schedule-filters" id="pitch-filters">
+      <button class="filter-btn active" id="pitch-btn-tournament" onclick="setPitchView('tournament',this)">This Tournament</button>
+      <button class="filter-btn"        id="pitch-btn-all"        onclick="setPitchView('all',this)">All Tournaments</button>
+    </div>
     <div id="pitches-content"><div class="loading"><div class="spinner"></div>Loading pitch allocation…</div></div>
   </div>
 </main>
@@ -994,73 +1018,75 @@ function renderBracket() {
 }
 
 // ── PITCH ALLOCATION ──────────────────────────────────────────────────
-function renderPitches() {
-  const tgames = tournamentGames();
-  // Collect unique pitches and times (only games that have both)
-  const gamesWithPitch = tgames.filter(g => g.pitch && g.pitch !== '');
+let pitchView = 'tournament'; // 'tournament' | 'all'
 
-  if (!gamesWithPitch.length) {
-    document.getElementById('pitches-content').innerHTML =
-      '<div class="no-data">No pitch or time data found in the sheet yet.<br>Fill in the Time and Pitch columns to see the allocation grid.</div>';
-    return;
-  }
+function setPitchView(mode, btn) {
+  pitchView = mode;
+  document.querySelectorAll('#pitch-filters .filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderPitches();
+}
 
-  // Parse times for sorting — support HH:MM or H:MM AM/PM
-  function parseTime(t) {
-    if (!t) return 9999;
-    const clean = t.trim().toUpperCase();
-    // Try HH:MM 24h
-    let m = clean.match(/^(\d{1,2}):(\d{2})$/);
-    if (m) return parseInt(m[1]) * 60 + parseInt(m[2]);
-    // Try H:MM AM/PM
-    m = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
-    if (m) {
-      let h = parseInt(m[1]), min = parseInt(m[2]);
-      if (m[3] === 'PM' && h < 12) h += 12;
-      if (m[3] === 'AM' && h === 12) h = 0;
-      return h * 60 + min;
-    }
-    return 9999;
+function parseTime(t) {
+  if (!t) return 9999;
+  const clean = t.trim().toUpperCase();
+  let m = clean.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) return parseInt(m[1]) * 60 + parseInt(m[2]);
+  m = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+  if (m) {
+    let h = parseInt(m[1]), min = parseInt(m[2]);
+    if (m[3] === 'PM' && h < 12) h += 12;
+    if (m[3] === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
   }
+  return 9999;
+}
+
+function buildPitchGrid(games) {
+  const gamesWithPitch = games.filter(g => g.pitch && g.pitch !== '');
+  if (!gamesWithPitch.length) return null;
 
   const pitches = [...new Set(gamesWithPitch.map(g => g.pitch))].sort();
-  const times   = [...new Set(tgames.filter(g => g.time && g.time !== '').map(g => g.time))]
-                  .sort((a,b) => parseTime(a) - parseTime(b));
+  const times   = [...new Set(games.filter(g => g.time && g.time !== '').map(g => g.time))]
+                  .sort((a, b) => parseTime(a) - parseTime(b));
 
-  // Build lookup: time -> pitch -> game
   const grid = {};
   for (const t of times) {
     grid[t] = {};
     for (const p of pitches) grid[t][p] = null;
   }
-  for (const g of tgames) {
+  for (const g of games) {
     if (g.time && g.pitch && grid[g.time] !== undefined) {
-      grid[g.time][g.pitch] = g;
+      // If multiple games share same time+pitch, keep an array
+      if (!grid[g.time][g.pitch]) grid[g.time][g.pitch] = g;
+      // else: first-come wins (shouldn't happen in valid data)
     }
   }
+  return { pitches, times, grid };
+}
 
-  const totalCols = 1 + pitches.length; // time col + pitch cols
+function pitchGridHTML(data, showTournament) {
+  const { pitches, times, grid } = data;
   const colTemplate = `80px ${pitches.map(() => '1fr').join(' ')}`;
 
   let html = `<div class="pitch-grid-wrap">
     <div class="pitch-grid" style="grid-template-columns:${colTemplate}">`;
 
-  // Header row
   html += `<div class="pg-corner">Time / Pitch</div>`;
-  for (const p of pitches) {
-    html += `<div class="pg-pitch-head">📍 ${p}</div>`;
-  }
+  for (const p of pitches) html += `<div class="pg-pitch-head">📍 ${p}</div>`;
 
-  // Time rows
   for (const t of times) {
     html += `<div class="pg-time-label">${t}</div>`;
     for (const p of pitches) {
       const g = grid[t][p];
       if (g) {
         const bc = poolBlockClass(g.pool);
+        const tournBadge = showTournament
+          ? `<div class="gb-tournament">${g.tournament}</div>`
+          : '';
         html += `<div class="pg-cell">
           <div class="game-block ${bc}">
-            <div class="gb-time">${g.time}</div>
+            ${tournBadge}
             <div class="gb-teams">${g.teamA}</div>
             <div class="gb-vs">vs</div>
             <div class="gb-teams">${g.teamB}</div>
@@ -1074,15 +1100,56 @@ function renderPitches() {
   }
 
   html += '</div></div>';
+  return html;
+}
 
-  // Legend
+function renderPitches() {
+  const showAll = pitchView === 'all';
+  const games   = showAll ? allGames : tournamentGames();
+
+  // Sync filter button states (in case renderAll is called)
+  document.getElementById('pitch-btn-tournament')?.classList.toggle('active', !showAll);
+  document.getElementById('pitch-btn-all')?.classList.toggle('active', showAll);
+
+  const data = buildPitchGrid(games);
+
+  if (!data) {
+    document.getElementById('pitches-content').innerHTML =
+      '<div class="no-data">No pitch or time data found in the sheet yet.<br>Fill in the Time and Pitch columns to see the allocation grid.</div>';
+    return;
+  }
+
+  let html = '';
+
+  if (showAll) {
+    // All-tournaments view: one grid with tournament badges on each cell
+    html += `<div class="pitch-all-header">
+      <span class="pitch-all-title">All Tournaments — Full Pitch Schedule</span>
+    </div>`;
+    html += pitchGridHTML(data, true);
+  } else {
+    // Single-tournament view: no tournament badge needed
+    html += pitchGridHTML(data, false);
+  }
+
+  // Dynamic legend from pools present in this view
+  const poolsPresent = [...new Set(games.map(g => g.pool))];
+  const regularPools = poolsPresent.filter(p => !isKnockout(p));
+  const hasKO = poolsPresent.some(p => isKnockout(p));
+
+  const legendItems = regularPools.map((p, i) => {
+    const colors = ['var(--pool-a)','var(--pool-b)','var(--pool-c)','var(--pool-d, #4fc3f7)'];
+    return { color: colors[i % colors.length], label: p };
+  });
+  if (hasKO) legendItems.push({ color: 'var(--sf-color)', label: 'Knockouts' });
+
   html += `<div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
     <div class="section-title" style="width:100%">Legend</div>
-    ${[['pool-a-block','var(--pool-a)','Pool A'],['pool-b-block','var(--pool-b)','Pool B'],
-       ['pool-c-block','var(--pool-c)','Pool C'],['ko-block','var(--sf-color)','Knockouts']]
-      .map(([cls,col,lbl]) => `<div style="display:flex;align-items:center;gap:7px;font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
-        <div style="width:14px;height:14px;border-radius:3px;background:${col};opacity:.85"></div>${lbl}
-      </div>`).join('')}
+    ${legendItems.map(({ color, label }) =>
+      `<div style="display:flex;align-items:center;gap:7px;font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
+        <div style="width:14px;height:14px;border-radius:3px;background:${color};opacity:.85"></div>${label}
+      </div>`
+    ).join('')}
   </div>`;
 
   document.getElementById('pitches-content').innerHTML = html;
