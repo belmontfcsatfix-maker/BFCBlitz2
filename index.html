@@ -293,12 +293,17 @@
     cursor: pointer; transition: all 0.2s;
   }
   .filter-btn:hover { color: var(--white); border-color: rgba(245,200,0,0.3); }
-  .filter-btn.active { color: var(--navy); font-weight: 700; border-color: transparent; }
-  .filter-btn[data-pool="all"].active      { background: var(--off-white); }
-  .filter-btn[data-pool="Pool A"].active   { background: var(--pool-a); }
-  .filter-btn[data-pool="Pool B"].active   { background: var(--pool-b); }
-  .filter-btn[data-pool="Pool C"].active   { background: var(--pool-c); }
-  .filter-btn[data-pool="Knockouts"].active{ background: var(--yellow); }
+  .filter-btn.active {
+    background: var(--yellow);
+    color: var(--navy);
+    font-weight: 700;
+    border-color: var(--yellow);
+  }
+  .filter-btn[data-pool="all"].active      { background: var(--off-white); border-color: var(--off-white); }
+  .filter-btn[data-pool="Pool A"].active   { background: var(--pool-a);    border-color: var(--pool-a); }
+  .filter-btn[data-pool="Pool B"].active   { background: var(--pool-b);    border-color: var(--pool-b); }
+  .filter-btn[data-pool="Pool C"].active   { background: var(--pool-c);    border-color: var(--pool-c); }
+  .filter-btn[data-pool="Knockouts"].active{ background: var(--yellow);    border-color: var(--yellow); }
   #schedule-view-toggle { margin-bottom: 0; }
   #schedule-filters { margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); }
 
